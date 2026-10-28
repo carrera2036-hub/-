@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to validate safe string attributes
+    function isValidText(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // 1. News Articles: Public read, validate fields on write
+    match /news/{document} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAll(['title', 'category', 'content', 'date'])
+        && isValidText(request.resource.data.title, 3, 300)
+        && isValidText(request.resource.data.category, 2, 50)
+        && isValidText(request.resource.data.content, 5, 30000);
+      allow delete: if true;
+    }
+    
+    // 2. System Settings: Public read, size-controlled write
+    match /system_settings/{document} {
+      allow read: if true;
+      allow write: if request.resource.data is map;
+    }
+    
+    // 3. Citizen Complaints: Public can submit with strict validation, read allowed for verification
+    match /complaints/{document} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['trackingCode', 'senderName', 'senderPhone', 'category', 'details', 'date', 'status'])
+        && isValidText(request.resource.data.trackingCode, 3, 40)
+        && isValidText(request.resource.data.senderName, 2, 120)
+        && isValidText(request.resource.data.senderPhone, 5, 30)
+        && isValidText(request.resource.data.details, 3, 4000)
+        && isValidText(request.resource.data.status, 2, 50);
+      allow update: if request.resource.data.details is string;
+      allow delete: if true;
+    }
+    
+    // 4. Contact Us Inquiries: Public can submit inquiry with strict validation
+    match /contacts/{document} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['name', 'phone', 'message', 'subject', 'date'])
+        && isValidText(request.resource.data.name, 2, 120)
+        && isValidText(request.resource.data.phone, 5, 30)
+        && isValidText(request.resource.data.message, 3, 4000)
+        && isValidText(request.resource.data.subject, 2, 100);
+      allow update, delete: if true;
+    }
+  }
+}
